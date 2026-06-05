@@ -8,3 +8,5 @@ beautifulsoup4
 pillow
 zhconv
 gunicorn
+dj-database-url
+psycopg2-binary
