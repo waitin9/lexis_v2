@@ -1,0 +1,10 @@
+django>=5.0
+python-decouple
+whitenoise
+google-genai
+pydantic
+python-dotenv
+beautifulsoup4
+pillow
+zhconv
+gunicorn

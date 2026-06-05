@@ -1,0 +1,734 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>複習單字 — Lexis</title>
+  <link rel="stylesheet" href="{% static 'css/main.css' %}" />
+  <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --font-serif: 'Lora', Georgia, serif;
+    }
+
+    /* 英文內容字型覆寫 (襯線體學術風) */
+    .front-word,
+    #word-text,
+    .back-word-title,
+    .back-example-sentence,
+    .back-definition {
+      font-family: var(--font-serif) !important;
+    }
+
+    /* 複習介面專屬樣式 */
+    .study-container {
+      min-height: 100vh;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 60px 20px;
+    }
+
+    .study-card-perspective {
+      perspective: 1000px;
+      width: 95%;
+      max-width: 860px;
+      height: 540px;
+      margin-top: 20px;
+      margin-bottom: 24px;
+      transition: all 0.3s ease;
+    }
+
+    /* 響應式網頁 (Responsive Web Design) 媒體查詢 */
+    @media (max-width: 992px) {
+      .study-card-perspective {
+        max-width: 720px;
+        height: 520px;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .study-card-perspective {
+        max-width: 100%;
+        height: 480px;
+      }
+      .front-word {
+        font-size: 2.8rem;
+      }
+      .study-card-face {
+        padding: 24px;
+      }
+      .back-translation {
+        font-size: 1.3rem;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .study-card-perspective {
+        height: 450px;
+        margin-top: 10px;
+        margin-bottom: 16px;
+      }
+      .front-word {
+        font-size: 2.2rem;
+      }
+      .study-card-face {
+        padding: 16px;
+      }
+      .back-word-title {
+        font-size: 1.35rem;
+      }
+      .study-srs-btn {
+        padding: 8px 4px;
+        font-size: 0.72rem;
+      }
+      .study-srs-btn .btn-srs-label {
+        font-size: 0.85rem;
+      }
+    }
+
+    .study-flip-card {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      transform-style: preserve-3d;
+      transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+      cursor: pointer;
+    }
+
+    /* 翻轉狀態 */
+    .study-flip-card.flipped {
+      transform: rotateY(180deg);
+    }
+
+    .study-card-face {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      border-radius: var(--radius-lg);
+      padding: 36px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      background: var(--card-face-bg, rgba(22, 22, 26, 0.75));
+      border: 1px solid var(--card-border, var(--border));
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      box-shadow: var(--card-shadow, var(--shadow-card));
+      transition: border-color var(--transition);
+    }
+
+    .study-card-face:hover {
+      border-color: var(--accent-glow-color, rgba(108, 99, 255, 0.3));
+    }
+
+    /* 雙重保險：動態 z-index 交換解決 Chrome 渲染層級問題 */
+    .face-front {
+      z-index: 2;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .face-back {
+      transform: rotateY(180deg);
+      background: var(--card-back-bg, rgba(26, 26, 32, 0.85));
+      z-index: 1;
+    }
+
+    .study-flip-card.flipped .face-front {
+      z-index: 1;
+    }
+    .study-flip-card.flipped .face-back {
+      z-index: 2;
+    }
+
+    /* 正面排版 */
+    .front-word {
+      font-size: 3.5rem;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      background: var(--front-word-gradient, linear-gradient(135deg, #fff 40%, var(--accent) 100%));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 12px;
+      text-align: center;
+      word-break: break-all;
+    }
+
+    .front-phonetic-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--font-mono);
+      font-size: 1.1rem;
+      color: var(--text-secondary);
+      margin-bottom: 30px;
+    }
+
+    .front-audio-btn {
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 4px 12px;
+      cursor: pointer;
+      font-size: 0.72rem;
+      transition: all var(--transition);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      line-height: 1;
+    }
+    .front-audio-btn:hover {
+      background: var(--accent-glow, rgba(108, 99, 255, 0.15));
+      border-color: var(--accent);
+      color: var(--accent);
+      transform: translateY(-1px);
+    }
+
+    .reveal-hint-text {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-top: 40px;
+    }
+
+    /* 背面排版 */
+    .back-content-scroll {
+      overflow-y: auto;
+      flex: 1;
+      min-height: 0; /* CRITICAL for flexbox scrolling */
+      padding-right: 6px;
+      margin-bottom: 16px;
+    }
+    .back-content-scroll::-webkit-scrollbar {
+      width: 4px;
+    }
+    .back-content-scroll::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 2px;
+    }
+
+    .back-word-title {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 2px;
+    }
+    .back-phonetic {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+
+    .back-translation {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+    }
+    .back-definition {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      margin-bottom: 16px;
+    }
+
+    .back-example-card {
+      background: rgba(255, 255, 255, 0.03);
+      border-left: 3px solid var(--accent);
+      padding: 12px 16px;
+      border-radius: 0 var(--radius) var(--radius) 0;
+      font-size: 0.85rem;
+      margin-bottom: 14px;
+    }
+    .back-example-sentence {
+      color: var(--text-primary);
+      font-style: italic;
+      line-height: 1.4;
+      margin-bottom: 4px;
+    }
+    .back-example-translation {
+      color: var(--text-muted);
+    }
+
+    .back-note {
+      font-size: 0.82rem;
+      color: var(--yellow);
+      background: rgba(232, 184, 75, 0.08);
+      border: 1px solid rgba(232, 184, 75, 0.2);
+      border-radius: var(--radius-sm);
+      padding: 8px 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* SRS 按鈕微調 */
+    .study-srs-buttons {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      width: 100%;
+      margin-top: auto;
+    }
+
+    .study-srs-btn {
+      padding: 10px 6px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-secondary);
+      font-size: 0.78rem;
+      cursor: pointer;
+      transition: all var(--transition);
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+    }
+    .study-srs-btn:hover {
+      transform: translateY(-2px);
+    }
+    .study-srs-btn .btn-srs-label {
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-bottom: 2px;
+    }
+    .study-srs-btn .btn-srs-shortcut {
+      position: absolute;
+      top: -6px;
+      right: 6px;
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      background: var(--border);
+      color: var(--text-muted);
+      padding: 0 4px;
+      border-radius: 3px;
+    }
+
+    .study-srs-again { border-color: var(--red); color: var(--red); }
+    .study-srs-again:hover { background: rgba(224, 92, 92, 0.1); }
+    .study-srs-again:hover .btn-srs-shortcut { background: var(--red); color: #fff; }
+
+    .study-srs-hard { border-color: var(--yellow); color: var(--yellow); }
+    .study-srs-hard:hover { background: rgba(232, 184, 75, 0.1); }
+    .study-srs-hard:hover .btn-srs-shortcut { background: var(--yellow); color: #0d1a12; }
+
+    .study-srs-good { border-color: var(--blue); color: var(--blue); }
+    .study-srs-good:hover { background: rgba(74, 158, 255, 0.1); }
+    .study-srs-good:hover .btn-srs-shortcut { background: var(--blue); color: #fff; }
+
+    .study-srs-easy { border-color: var(--green); color: var(--green); }
+    .study-srs-easy:hover { background: rgba(76, 175, 130, 0.1); }
+    .study-srs-easy:hover .btn-srs-shortcut { background: var(--green); color: #0d1a12; }
+  </style>
+</head>
+<body data-theme="{{ user_theme|default:'deep-space' }}">
+  <!-- 飄浮光暈與星光背景 -->
+  <div id="orb-permanent-1" class="orb orb-1"></div>
+  <div id="orb-permanent-2" class="orb orb-2"></div>
+  <div class="stars-layer" id="stars-permanent" style="display: {% if user_profile and user_profile.particle_effect %}block{% elif user_profile is None %}block{% else %}none{% endif %};">
+    <div class="star" style="top: 15%; left: 20%; animation-delay: 0.2s;"></div>
+    <div class="star" style="top: 40%; left: 85%; animation-delay: 1.5s;"></div>
+    <div class="star" style="top: 75%; left: 8%; animation-delay: 0.7s;"></div>
+    <div class="star" style="top: 62%; left: 32%; animation-delay: 2.1s;"></div>
+    <div class="star" style="top: 22%; left: 68%; animation-delay: 1.1s;"></div>
+    <div class="star" style="top: 82%; left: 74%; animation-delay: 0.4s;"></div>
+    <div class="star" style="top: 50%; left: 52%; animation-delay: 1.8s;"></div>
+    <div class="star" style="top: 12%; left: 90%; animation-delay: 2.5s;"></div>
+    <div class="star" style="top: 88%; left: 28%; animation-delay: 1.3s;"></div>
+    <div class="star" style="top: 28%; left: 44%; animation-delay: 0.9s;"></div>
+  </div>
+
+<!-- 頂部資訊列 -->
+<div class="study-topbar">
+  <a href="{% url 'vocab:dashboard' %}" class="btn btn-ghost btn-sm" data-turbo="false">← 退出</a>
+  <div class="study-progress">
+    <div class="study-progress-bar" id="study-progress-bar" style="width: 0%"></div>
+  </div>
+  <span class="text-muted text-sm">{{ due_count }} 張待複習</span>
+</div>
+
+<div class="study-container">
+
+  <!-- 3D 翻轉卡片 -->
+  <div class="study-card-perspective">
+    <div class="study-flip-card" id="study-flip-card">
+      
+      <!-- 正面：只顯示單字與音標 -->
+      <div class="study-card-face face-front {% if user_profile and user_profile.card_border_style == 'platinum' %}card-border-platinum{% endif %}">
+        <div class="front-word" id="word-text">{{ card.user_vocab.display_text }}</div>
+        
+        <div class="front-phonetic-wrap">
+          {% if phonetic_display %}
+            <span style="font-size: 0.95rem; opacity: 0.8; margin-right: 4px;">/{{ phonetic_display }}/</span>
+          {% endif %}
+          <button class="front-audio-btn" id="study-speak-us" title="美式發音">US 🔊</button>
+          <button class="front-audio-btn" id="study-speak-uk" title="英式發音">UK 🔊</button>
+        </div>
+        
+        <div class="reveal-hint-text">點擊卡片或按 Space 查看答案</div>
+      </div>
+ 
+      <!-- 背面：顯示釋義與 SRS 按鈕 -->
+      <div class="study-card-face face-back {% if user_profile and user_profile.card_border_style == 'platinum' %}card-border-platinum{% endif %}">
+        <div class="back-content-scroll">
+          <div class="back-word-title">{{ card.user_vocab.display_text }}</div>
+          {% if phonetic_display %}
+            <div class="back-phonetic" style="margin-top: 2px; margin-bottom: 12px; display: flex; gap: 8px;">
+              <span>/{{ phonetic_display }}/</span>
+            </div>
+          {% endif %}
+
+          {% if not card.user_vocab.word or not card.user_vocab.word.senses.exists %}
+            <!-- 自建單字或無多重義項時的相容顯示 -->
+            <div class="back-translation">{{ card.user_vocab.display_translation }}</div>
+            
+            {% with def=card.user_vocab.display_definition %}
+            {% if def %}
+            <div class="back-definition">{{ def }}</div>
+            {% endif %}
+            {% endwith %}
+            
+            {% with ex=card.user_vocab.display_example %}
+            {% if ex %}
+            <div class="back-example-card">
+              <div class="back-example-sentence">"{{ ex }}"</div>
+            </div>
+            {% endif %}
+            {% endwith %}
+          {% else %}
+            <!-- 官方單字多重義項與例句完整呈現 -->
+            {% for sense in card.user_vocab.word.senses.all %}
+            <div style="margin-bottom: 20px;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                <span class="pos-badge pos-{{ sense.pos_class }}">{{ sense.pos_display }}</span>
+                <span style="font-size:0.8rem;color:var(--text-muted);">義項 {{ forloop.counter }}</span>
+              </div>
+              <div style="font-size:1.3rem;font-weight:600;color:var(--text-primary);margin-bottom:6px;">
+                {{ sense.translation }}
+              </div>
+              {% if sense.definition %}
+              <div class="back-definition" style="margin-bottom:10px; line-height: 1.5;">{{ sense.definition }}</div>
+              {% endif %}
+              {% for ex in sense.examples.all %}
+              <div class="back-example-card" style="margin-bottom:10px;">
+                <div class="back-example-sentence">"{{ ex.sentence }}"</div>
+                {% if ex.translation %}
+                <div class="back-example-translation">{{ ex.translation }}</div>
+                {% endif %}
+              </div>
+              {% endfor %}
+            </div>
+            {% if not forloop.last %}
+            <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.05); margin: 16px 0;" />
+            {% endif %}
+            {% endfor %}
+          {% endif %}
+          
+          <!-- 個人備註 (Inplace 編輯) -->
+          <div style="margin-top: 10px; display: inline-block; width: 100%;">
+            <div id="note-display-wrapper" class="back-note" style="cursor: pointer; display: {% if card.user_vocab.note %}inline-flex{% else %}none{% endif %}; align-items: center; gap: 6px;" title="點擊編輯備註">
+              <span>💡</span>
+              <span id="note-text-content">{{ card.user_vocab.note }}</span>
+              <span style="font-size: 0.72rem; opacity: 0.6; margin-left: 4px;">✎</span>
+            </div>
+            <div id="note-add-btn-wrapper" style="display: {% if not card.user_vocab.note %}block{% else %}none{% endif %};">
+              <button type="button" id="add-note-btn" class="btn btn-ghost btn-sm" style="border-color: rgba(232, 184, 75, 0.2); color: var(--yellow); padding: 4px 10px; font-size: 0.75rem; background: transparent;">
+                + 新增個人備註
+              </button>
+            </div>
+            <!-- 隱藏的編輯區 -->
+            <div id="note-edit-wrapper" style="display: none; margin-top: 8px;">
+              <div style="display: flex; gap: 8px; align-items: center; width: 100%;">
+                <input type="text" id="note-input" class="form-control" style="padding: 6px 10px; font-size: 0.8rem; border-color: rgba(232, 184, 75, 0.3); flex: 1;" placeholder="輸入記憶技巧、聯想詞..." value="{{ card.user_vocab.note }}" autocomplete="off" />
+                <button type="button" id="save-note-btn" class="btn btn-primary btn-sm" style="padding: 5px 12px; font-size: 0.75rem; background: var(--yellow); border-color: var(--yellow); color: #0d1a12; font-weight: 600;">儲存</button>
+                <button type="button" id="cancel-note-btn" class="btn btn-ghost btn-sm" style="padding: 5px 12px; font-size: 0.75rem;">取消</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SRS 表單 -->
+        <form method="post" action="{% url 'vocab:submit_review' card.id %}" id="srs-form" style="width:100%">
+          {% csrf_token %}
+          <input type="hidden" name="quality" id="srs-quality-input" />
+          <div class="study-srs-buttons">
+            <button type="submit" name="quality" value="0" class="study-srs-btn study-srs-again" title="快速複習 (快捷鍵: 1)">
+              <span class="btn-srs-shortcut">1</span>
+              <span class="btn-srs-label">又忘了</span>
+              立刻重複
+            </button>
+            <button type="submit" name="quality" value="1" class="study-srs-btn study-srs-hard" title="快速複習 (快捷鍵: 2)">
+              <span class="btn-srs-shortcut">2</span>
+              <span class="btn-srs-label">困難</span>
+              明天
+            </button>
+            <button type="submit" name="quality" value="2" class="study-srs-btn study-srs-good" title="快速複習 (快捷鍵: 3)">
+              <span class="btn-srs-shortcut">3</span>
+              <span class="btn-srs-label">記得</span>
+              4 天後
+            </button>
+            <button type="submit" name="quality" value="3" class="study-srs-btn study-srs-easy" title="快速複習 (快捷鍵: 4)">
+              <span class="btn-srs-shortcut">4</span>
+              <span class="btn-srs-label">輕鬆</span>
+              更久後
+            </button>
+          </div>
+        </form>
+
+      </div><!-- /face-back -->
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function() {
+  const flipCard = document.getElementById('study-flip-card');
+  const speakBtn = document.getElementById('study-speak-btn');
+  const progressBar = document.getElementById('study-progress-bar');
+  const srsForm = document.getElementById('srs-form');
+  const dueCount = {{ due_count }};
+  const totalCount = {{ total_count|default:due_count }};
+  const wordText = "{{ card.user_vocab.display_text|escapejs }}";
+  const userAutoPronounce = {{ user_profile.auto_pronounce|yesno:"true,false" }};
+  const userPronunciationPref = "{{ user_profile.pronunciation_pref|default:'US' }}";
+
+  if (totalCount > 0) {
+    const completed = totalCount - dueCount;
+    // 計算真實複習進度，完成越多進度條越長，起點給予 5% 的引導，最大為 100%
+    const pct = Math.max(5, Math.min(100, (completed / totalCount) * 100));
+    progressBar.style.width = pct + '%';
+  }
+
+  function speak(text, lang = 'en-US') {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = lang;
+      utterance.rate = 0.85;
+      window.speechSynthesis.speak(utterance);
+    }
+  }
+
+  setTimeout(() => {
+    if (userAutoPronounce) {
+      const prefLang = userPronunciationPref === 'UK' ? 'en-GB' : 'en-US';
+      speak(wordText, prefLang);
+    }
+  }, 300);
+
+  const speakUsBtn = document.getElementById('study-speak-us');
+  const speakUkBtn = document.getElementById('study-speak-uk');
+
+  speakUsBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    speak(wordText, 'en-US');
+  });
+
+  speakUkBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    speak(wordText, 'en-GB');
+  });
+
+  function toggleFlip() {
+    flipCard.classList.toggle('flipped');
+    if (flipCard.classList.contains('flipped')) {
+      // 翻面到背面時也再次朗讀單字，加深聽覺印象
+      setTimeout(() => {
+        if (userAutoPronounce) {
+          const prefLang = userPronunciationPref === 'UK' ? 'en-GB' : 'en-US';
+          speak(wordText, prefLang);
+        }
+      }, 200);
+    }
+  }
+
+  // ── 例句單字高亮 ──
+  const exSentences = document.querySelectorAll('.back-example-sentence');
+  exSentences.forEach(div => {
+    let text = div.innerHTML;
+    const escapedWord = wordText.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const regex = new RegExp(`\\b(${escapedWord}[a-zA-Z]*)\\b`, 'gi');
+    text = text.replace(regex, `<strong style="color:var(--accent); font-weight:700;">$1</strong>`);
+    div.innerHTML = text;
+  });
+
+  // ── 原地備註快速編輯 ──
+  const noteDisplay = document.getElementById('note-display-wrapper');
+  const noteAddBtn  = document.getElementById('add-note-btn');
+  const noteEdit    = document.getElementById('note-edit-wrapper');
+  const noteInput   = document.getElementById('note-input');
+  const saveNoteBtn = document.getElementById('save-note-btn');
+  const cancelNoteBtn = document.getElementById('cancel-note-btn');
+  const noteTextContent = document.getElementById('note-text-content');
+
+  function openNoteEdit(e) {
+    if (e) e.stopPropagation();
+    noteDisplay.style.display = 'none';
+    if (noteAddBtn) noteAddBtn.parentElement.style.display = 'none';
+    noteEdit.style.display = 'block';
+    noteInput.focus();
+  }
+
+  function closeNoteEdit() {
+    noteEdit.style.display = 'none';
+    if (noteTextContent.innerText.trim()) {
+      noteDisplay.style.display = 'inline-flex';
+      if (noteAddBtn) noteAddBtn.parentElement.style.display = 'none';
+    } else {
+      noteDisplay.style.display = 'none';
+      if (noteAddBtn) noteAddBtn.parentElement.style.display = 'block';
+    }
+  }
+
+  if (noteDisplay) noteDisplay.addEventListener('click', openNoteEdit);
+  if (noteAddBtn) noteAddBtn.addEventListener('click', openNoteEdit);
+  if (cancelNoteBtn) cancelNoteBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    closeNoteEdit();
+  });
+  if (noteInput) {
+    noteInput.addEventListener('click', (e) => e.stopPropagation());
+    noteInput.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        saveNote();
+      } else if (e.key === 'Escape') {
+        closeNoteEdit();
+      }
+    });
+  }
+
+  async function saveNote() {
+    const val = noteInput.value.trim();
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    const url = "{% url 'vocab:update_vocab_api' card.user_vocab.id %}";
+    
+    saveNoteBtn.disabled = true;
+    saveNoteBtn.innerText = '儲存中...';
+
+    try {
+      const fd = new FormData();
+      fd.append('note', val);
+      
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': csrfToken
+        },
+        body: fd
+      });
+      const data = await resp.json();
+      
+      if (data.success) {
+        noteTextContent.innerText = data.note;
+        noteInput.value = data.note;
+        closeNoteEdit();
+      } else {
+        alert('儲存失敗，請稍後再試。');
+      }
+    } catch (e) {
+      alert('網路錯誤，請稍後再試。');
+    } finally {
+      saveNoteBtn.disabled = false;
+      saveNoteBtn.innerText = '儲存';
+    }
+  }
+
+  if (saveNoteBtn) {
+    saveNoteBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      saveNote();
+    });
+  }
+
+  flipCard.addEventListener('click', (e) => {
+    if (e.target.closest('#study-speak-us') || e.target.closest('#study-speak-uk') || e.target.closest('.study-srs-btn') || e.target.closest('#note-edit-wrapper') || e.target.closest('#note-add-btn-wrapper') || e.target.closest('#note-display-wrapper')) return;
+    toggleFlip();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+    const isFlipped = flipCard.classList.contains('flipped');
+    const key = e.key;
+
+    if (key === ' ' || key === 'Enter') {
+      e.preventDefault();
+      toggleFlip(); // 直接使用 JS toggleFlip 確保空白鍵能 100% 成功觸發翻面
+    } else if (isFlipped && (key === '1' || key === '2' || key === '3' || key === '4')) {
+      e.preventDefault();
+      const qualityVal = parseInt(key) - 1;
+      const button = srsForm.querySelector(`.study-srs-btn[value="${qualityVal}"]`);
+      if (button) {
+        button.click();
+      }
+    } else if (key.toLowerCase() === 'v') {
+      const prefLang = userPronunciationPref === 'UK' ? 'en-GB' : 'en-US';
+      speak(wordText, prefLang);
+    }
+  });
+
+  // 監聽 SRS 表單提交，加入精緻的點擊按壓反饋與卡片漸隱動畫，解決切換不直觀的體驗問題
+  srsForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const submitter = e.submitter;
+    if (!submitter) {
+      srsForm.submit();
+      return;
+    }
+
+    const qualityVal = submitter.value;
+    document.getElementById('srs-quality-input').value = qualityVal;
+
+    // 禁用所有按鈕防止重複點擊，並給予極強的選取回饋
+    const buttons = srsForm.querySelectorAll('.study-srs-btn');
+    buttons.forEach(btn => {
+      btn.style.pointerEvents = 'none';
+      if (btn !== submitter) {
+        btn.style.opacity = '0.15';
+        btn.style.filter = 'grayscale(100%)';
+        btn.style.transform = 'scale(0.96)';
+      } else {
+        btn.style.transform = 'scale(0.93)';
+        btn.style.borderColor = 'var(--accent, currentColor)';
+        btn.style.boxShadow = '0 0 15px var(--accent-glow, rgba(108, 99, 255, 0.2))';
+        const label = btn.querySelector('.btn-srs-label');
+        if (label && !label.innerText.startsWith('✓')) {
+          label.innerHTML = `✓ ${label.innerText}`;
+        }
+      }
+    });
+
+    // 讓卡片的外層透視容器產生漸隱與縮小動畫，避免直接修改 3D 翻轉卡片的 transform 導致 Y 軸旋轉被干擾而產生鏡像翻轉 Bug
+    const perspectiveContainer = document.querySelector('.study-card-perspective');
+    if (perspectiveContainer) {
+      perspectiveContainer.style.transition = 'all 0.22s cubic-bezier(0.4, 0, 0.2, 1)';
+      perspectiveContainer.style.opacity = '0';
+      perspectiveContainer.style.transform = 'scale(0.96) translateY(12px)';
+    }
+
+    // 延遲 220ms 等待動畫結束後再正式提交
+    setTimeout(() => {
+      srsForm.submit();
+    }, 220);
+  });
+
+})();
+</script>
+</body>
+</html>
