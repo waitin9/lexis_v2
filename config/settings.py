@@ -59,10 +59,20 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 IS_RENDER = 'RENDER' in os.environ
 
+if IS_RENDER:
+    db_dir = Path('/data')
+    if db_dir.exists() and os.access(db_dir, os.W_OK):
+        DB_PATH = db_dir / 'db.sqlite3'
+    else:
+        print("WARNING: /data directory does not exist or is not writable. Falling back to local db.sqlite3.")
+        DB_PATH = BASE_DIR / 'db.sqlite3'
+else:
+    DB_PATH = BASE_DIR / 'db.sqlite3'
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': Path('/data/db.sqlite3') if IS_RENDER else BASE_DIR / 'db.sqlite3',
+        'NAME': DB_PATH,
         'OPTIONS': {
             'timeout': 20,
         }
